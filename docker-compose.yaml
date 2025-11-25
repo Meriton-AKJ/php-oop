@@ -1,0 +1,57 @@
+version: "3.8"
+
+services:
+  server:
+    build:
+      context: .
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DB_HOST: db
+      DB_DATABASE: ${DB_DATABASE}
+      DB_USER: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - ./src:/var/www/html
+    ports:
+      - ${PORT}:80
+          
+  db:
+    image: mariadb:11.4
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MARIADB_DATABASE: ${DB_DATABASE}
+      MARIADB_USER: ${DB_USERNAME}
+      MARIADB_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:5.2
+    restart: unless-stopped
+    ports:
+      - 8080:80
+    depends_on:
+      - db
+    environment:
+      - PMA_HOST=db
+
+  composer: # docker-compose run --rm composer install, docker-compose run --rm composer require monolog/monolog, ...
+    image: composer:2.4
+    volumes:
+      - .:/app
+    working_dir: /app
+    command: composer install
+
+volumes:
+  mariadb_data: {}
